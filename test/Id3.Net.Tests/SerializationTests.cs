@@ -55,6 +55,11 @@ namespace Id3.Net.Tests
 
             stream.Seek(0, SeekOrigin.Begin);
 
+            //todo temp
+            var blahBuffer = new byte[stream.Length];
+            stream.Read(blahBuffer, 0, 0);
+            stream.Seek(0, SeekOrigin.Begin);
+
             var deserializer = new BinaryFormatter();
             deserializer.IncludeId3SerializationSupport();
             var clonedTag = (Id3Tag)deserializer.Deserialize(stream);

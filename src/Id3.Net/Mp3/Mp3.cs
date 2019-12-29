@@ -17,12 +17,11 @@ limitations under the License.
 */
 #endregion
 
+using Id3.Resources;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-
-using Id3.Resources;
 
 namespace Id3
 {
@@ -279,6 +278,10 @@ namespace Id3
         {
             if (tag == null)
                 throw new ArgumentNullException(nameof(tag));
+
+            //todo move validation to a validator
+            if (tag.Version == 0)
+                throw new Exception($"ID3 Version not set");
 
             EnsureWritePermissions(Mp3Messages.NoWritePermissions_CannotWriteTag);
 

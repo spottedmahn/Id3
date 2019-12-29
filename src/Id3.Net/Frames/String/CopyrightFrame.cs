@@ -17,20 +17,25 @@ limitations under the License.
 */
 #endregion
 
+using Id3.Resources;
 using System;
 using System.Text.RegularExpressions;
-using Id3.Resources;
 
 namespace Id3.Frames
 {
     public sealed class CopyrightFrame : TextFrame
     {
         public CopyrightFrame()
-        {
-        }
+            : this(value: null) { }
 
-        public CopyrightFrame(string value) : base(value)
+        //todo review breaking change
+        //want to throw exceptions instead of losing data
+        public CopyrightFrame(string value)
+            : this(value, throwExceptionsOnInValidValue: false) { }
+
+        public CopyrightFrame(string value, bool throwExceptionsOnInValidValue) : base(value)
         {
+            this.throwExceptionsOnInValidValue = throwExceptionsOnInValidValue;
         }
 
         public override string ToString()
@@ -47,10 +52,26 @@ namespace Id3.Frames
         internal override string TextValue
         {
             get => base.TextValue;
-            set => base.TextValue = !string.IsNullOrEmpty(value) && !CopyrightPrefixPattern.IsMatch(value) ? null : value;
+            set
+            {
+                if (string.IsNullOrEmpty(value))
+                {
+                    base.TextValue = null;
+                    return;
+                }
+
+                var isValid = CopyrightPrefixPattern.IsMatch(value);
+
+                if (throwExceptionsOnInValidValue
+                    && !isValid)
+                    throw new InvalidCopyrightFrameException($"{value} does not conform to: The 'Copyright message' frame, in which the string must begin with a year and a space character(making five characters)");
+                else if (isValid)
+                    base.TextValue = value;
+            }
         }
 
         private static readonly Regex CopyrightPrefixPattern = new Regex(@"^\d{4} ");
+        private readonly bool throwExceptionsOnInValidValue;
 
         public static implicit operator CopyrightFrame(string value) => new CopyrightFrame(value);
     }

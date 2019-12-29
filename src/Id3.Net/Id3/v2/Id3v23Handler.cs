@@ -21,6 +21,7 @@ using Id3.Frames;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Id3.v2
@@ -97,7 +98,8 @@ namespace Id3.v2
             additionalData = headerContainer;
 
             byte flags = headerBytes[1];
-            var header = new Id3V2StandardHeader {
+            var header = new Id3V2StandardHeader
+            {
                 Revision = headerBytes[0],
                 Unsyncronization = (flags & 0x80) > 0,
                 ExtendedHeader = (flags & 0x40) > 0,
@@ -109,13 +111,17 @@ namespace Id3.v2
             var tagData = new byte[tagSize];
             stream.Read(tagData, 0, tagSize);
 
+            var unknownFrames = new List<string>();
+            var allFrames = new List<string>();
+
             var currentPos = 0;
             if (header.ExtendedHeader)
             {
                 SyncSafeNumber.DecodeSafe(tagData, currentPos, 4);
                 currentPos += 4;
 
-                var extendedHeader = new Id3V2ExtendedHeader {
+                var extendedHeader = new Id3V2ExtendedHeader
+                {
                     PaddingSize = SyncSafeNumber.DecodeNormal(tagData, currentPos + 2, 4)
                 };
 
@@ -123,19 +129,27 @@ namespace Id3.v2
                 {
                     extendedHeader.Crc32 = SyncSafeNumber.DecodeNormal(tagData, currentPos + 6, 4);
                     currentPos += 10;
-                } else
+                }
+                else
                     currentPos += 6;
 
                 headerContainer.ExtendedHeader = extendedHeader;
             }
 
+            var debugFrameSizes = new List<int>();
+            var errorOnUnknownFrames = false;
+            var lastFrame = "";
+
+            //debug not reading all frames
             while (currentPos < tagSize && tagData[currentPos] != 0x00)
+            //while (currentPos < tagSize)
             {
                 string frameId = Encoding.ASCII.GetString(tagData, currentPos, 4);
                 currentPos += 4;
 
                 int frameSize = SyncSafeNumber.DecodeNormal(tagData, currentPos, 4);
                 currentPos += 4;
+                debugFrameSizes.Add(frameSize);
 
                 var frameFlags = (ushort)((tagData[currentPos] << 0x08) + tagData[currentPos + 1]);
                 currentPos += 2;
@@ -146,11 +160,25 @@ namespace Id3.v2
                 FrameHandler mapping = FrameHandlers[frameId];
                 if (mapping != null)
                 {
+                    allFrames.Add(frameId);
                     Id3Frame frame = mapping.Decoder(frameData);
                     tag.AddUntypedFrame(frame);
                 }
+                else
+                {
+                    unknownFrames.Add(frameId);
+                }
 
+                lastFrame = frameId;
                 currentPos += frameSize;
+            }
+
+            var debug = string.Join("\n", allFrames.OrderBy(r => r));
+
+            if (errorOnUnknownFrames
+                && unknownFrames.Count > 0)
+            {
+                //throw new Exception($"Unknown frames: {string.Join(", ", unknownFrames.OrderBy(r => r))}");
             }
 
             return tag;
@@ -165,7 +193,8 @@ namespace Id3.v2
                 int currentTagSize = GetTagSize(stream);
                 if (requiredTagSize > currentTagSize)
                     MakeSpaceForTag(stream, currentTagSize, requiredTagSize);
-            } else
+            }
+            else
                 MakeSpaceForTag(stream, 0, requiredTagSize);
 
             stream.Seek(0, SeekOrigin.Begin);
@@ -268,9 +297,10 @@ namespace Id3.v2
                 if (mapping == null)
                     continue;
                 byte[] frameBytes = mapping.Encoder(frame);
-                bytes.AddRange(Encoding.ASCII.GetBytes(GetFrameIdFromFrame(frame)));
+                var frameId = GetFrameIdFromFrame(frame);
+                bytes.AddRange(Encoding.ASCII.GetBytes(frameId));
                 bytes.AddRange(SyncSafeNumber.EncodeNormal(frameBytes.Length));
-                bytes.AddRange(new byte[] {0, 0});
+                bytes.AddRange(new byte[] { 0, 0 });
                 bytes.AddRange(frameBytes);
             }
             int framesSize = bytes.Count - 6;

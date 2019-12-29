@@ -19,7 +19,9 @@ limitations under the License.
 
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+[assembly: InternalsVisibleTo("Id3.Net.Tests")]
 
 namespace Id3.Frames
 {
@@ -116,7 +118,8 @@ namespace Id3.Frames
             }
         }
 
-        private static readonly Regex TrackPattern = new Regex(@"^(\d+)(?:/(\d+))?$");
+        //private static readonly Regex TrackPattern = new Regex(@"^(\d+)(?:/(\d+))?$");
+        private static readonly Regex TrackPattern = new Regex(@"(\d+)(?:/(\d+))?");
 
         public static implicit operator TrackFrame(int value) => new TrackFrame(value);
     }
